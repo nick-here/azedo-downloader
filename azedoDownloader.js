@@ -1,6 +1,8 @@
 (function () {
 	// copy and paste into browser's console
 
+	const DEBUG = true;
+
 	const DELAY = 100;
 	const STORAGE_COUNTER_KEY = 'currentProduct';
 
@@ -13,9 +15,21 @@
 	};
 
 	const pathCallbacks = {
-		'': () => clickQuery(nodeQueries.navbarLink), // click navbar link
-		marka: () => clickQuery(nodeQueries.product), // click product
+		'': () => {
+			/// click navbar link
+
+			clickQuery(nodeQueries.navbarLink);
+			DEBUG && console.log('entering tab');
+		},
+		marka: () => {
+			/// click product
+
+			clickQuery(nodeQueries.product);
+			DEBUG && console.log('entering product');
+		},
 		sklep: () => {
+			/// download and go back
+
 			// click download
 			clickQuery(nodeQueries.download);
 
@@ -26,7 +40,9 @@
 			);
 
 			moveBack();
-		}, // download and go back
+
+			DEBUG && console.log('downloading');
+		},
 	};
 
 	// try clicking a query until its loaded
@@ -35,15 +51,18 @@
 			const element = document.querySelector(queryName);
 			if (element) {
 				element.click();
-				console.log(`element of query "${queryName}" clicked`);
 				clearInterval(id);
+
+				DEBUG && console.log(`element of query "${queryName}" clicked`);
 			}
 		}, 10);
 	};
 
 	const moveBack = () => {
-		console.log('moving back');
-		setTimeout(() => history.back(), DELAY);
+		setTimeout(() => {
+			history.back();
+			DEBUG && console.log('moving back');
+		}, DELAY);
 	};
 
 	const path = window.location.pathname.split('/')[1] ?? '';
