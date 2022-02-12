@@ -1,8 +1,12 @@
 (function () {
 	const DEBUG = true;
 
-	const DELAY = 1500;
-	const STORAGE_COUNTER_KEY = 'currentProduct';
+	if (window.location.origin !== 'https://azedo.pl') return;
+
+	const DELAY = 1000;
+	const INACTIVITY_TIMEOUT = 5000;
+	const STORAGE_PRODUCT_KEY = 'productIndex';
+	const STORAGE_TAB_KEY = 'tabIndex';
 	const PRODUCTS_PER_PAGE = 12;
 
 	// queries used to access site's elements
@@ -10,87 +14,102 @@
 		navbarLink: i => `#wide-nav .nav-top-link:nth-of-type(${i + 1})`,
 		product: i => `.product-small:nth-of-type(${i + 1}) a`,
 		download: i => `#somdn-form-submit-button`,
+		update: i => `.paoc-popup-click`,
 		backToMain: i => `#error-page .wc-forward`,
 		nextPage: i => '.next.page-number',
 	};
 
 	// try clicking a query until it's loaded
-	const clickQuery = (queryName, callback = null) => {
-		const id = setInterval(() => {
-			const element = document.querySelector(queryName);
-			if (element) {
-				element.click();
-				if (callback) callback();
-				clearInterval(id);
+	const clickQuery = queryName => document.querySelector(queryName).click();
 
-				DEBUG && console.log(`element of query "${queryName}" clicked`);
-			}
-		}, 10);
-	};
+	const moveBack = () => setTimeout(() => history.back(), DELAY);
 
-	const moveBack = () => {
-		setTimeout(() => {
-			history.back();
-			DEBUG && console.log('moving back');
-		}, DELAY);
-	};
-
-	// aim at the next product, next page if 12 products opened
+	// increment product index
 	const nextProduct = () => {
-		const newVal =
-			(parseInt(localStorage.getItem(STORAGE_COUNTER_KEY)) + 1) % PRODUCTS_PER_PAGE;
-
-		// increment product counter
-		localStorage.setItem(STORAGE_COUNTER_KEY, `${newVal}`);
-
-		if (newVal === 0) nextPage();
-
+		const newVal = parseInt(localStorage.getItem(STORAGE_PRODUCT_KEY)) + 1;
+		localStorage.setItem(STORAGE_PRODUCT_KEY, `${newVal}`);
 		DEBUG && console.log('next product');
 	};
 
-	const nextPage = () => {
-		const nextBtn = document.querySelector(nodeQueries.nextPage());
+	const nextTab = () => {
+		DEBUG && console.log('next tab');
+		alert();
+	};
 
-		if (nextBtn) {
-			nextBtn.click();
+	const nextPage = () =>
+		// if cannot find next page btn, move to the next tab
+		onQueryLoad(nodeQueries.nextPage(), () => clickQuery(nodeQueries.nextPage()), nextTab);
 
-			DEBUG && console.log('next page');
-		} else if (DEBUG) {
-			console.log('last page met');
-			alert('last page met');
-		}
+	// callback on element of given query loaded or when not found
+	const onQueryLoad = (queryName, onFound, onNotFound = null) => {
+		const id = setInterval(() => {
+			if (document.querySelector(queryName)) {
+				onFound();
+				clearInterval(id);
+			}
+		}, 10);
+
+		if (onNotFound) setTimeout(onNotFound, DELAY);
 	};
 
 	const pathCallbacks = {
 		'': () => {
 			/// click navbar link
 
-			clickQuery(nodeQueries.navbarLink(0));
-
-			DEBUG && console.log(`entering tab of index ${0}`);
+			onQueryLoad(
+				nodeQueries.navbarLink(0),
+				() => {
+					clickQuery(nodeQueries.navbarLink(0));
+					DEBUG && console.log(`entering tab of index ${0}`);
+				},
+				() => alert('Nie znaleziono zakładki')
+			);
 		},
 		marka: () => {
 			/// click product
 
-			const productIndex = parseInt(localStorage.getItem(STORAGE_COUNTER_KEY));
-			clickQuery(nodeQueries.product(productIndex));
+			let productIndex = parseInt(localStorage.getItem(STORAGE_PRODUCT_KEY));
 
-			DEBUG && console.log(`entering product of index ${productIndex}`);
+			// next page on loop
+			if (productIndex === PRODUCTS_PER_PAGE) {
+				localStorage.setItem(STORAGE_PRODUCT_KEY, '0');
+				productIndex = 0;
+				nextPage();
+			}
+
+			onQueryLoad(
+				nodeQueries.product(productIndex),
+				() => {
+					clickQuery(nodeQueries.product(productIndex));
+					DEBUG && console.log(`entering product of index ${productIndex}`);
+				},
+				nextTab
+			);
 		},
 		sklep: () => {
 			/// download and go back
 
-			clickQuery(nodeQueries.download(), nextProduct);
-			moveBack();
+			onQueryLoad(
+				nodeQueries.update(),
+				() => {
+					nextProduct();
+					clickQuery(nodeQueries.download());
+				},
+				() => console.warn('Product not found')
+			);
 
-			DEBUG && console.log('downloading');
+			moveBack();
 		},
 	};
 
+	// set default counter and tab values
+	if (!localStorage.getItem(STORAGE_PRODUCT_KEY)) localStorage.setItem(STORAGE_PRODUCT_KEY, '0');
+	if (!localStorage.getItem(STORAGE_TAB_KEY)) localStorage.setItem(STORAGE_TAB_KEY, '0');
+
+	// alert error after inactivity for too long
+	setTimeout(() => alert('Niepowodzenie'), INACTIVITY_TIMEOUT);
+
+	// execute specified callback depending on path
 	const path = window.location.pathname.split('/')[1] ?? '';
-
-	// set default counter value to 0
-	if (!localStorage.getItem(STORAGE_COUNTER_KEY)) localStorage.setItem(STORAGE_COUNTER_KEY, '0');
-
 	pathCallbacks[path]();
 })();
