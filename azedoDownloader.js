@@ -3,18 +3,21 @@
 
 	if (window.location.origin !== 'https://azedo.pl') return;
 
-	const DELAY = 2000;
+	const DELAY = 1000;
 	const INACTIVITY_TIMEOUT = 5000;
 	const STORAGE_PRODUCT_KEY = 'productIndex';
 	const STORAGE_TAB_KEY = 'tabIndex';
 	const PRODUCTS_PER_PAGE = 12;
 	const TAB_COUNT = 4;
 
+	/// alert error after inactivity for too long
+	const inactivityTimeout = setTimeout(() => alert('Niepowodzenie'), INACTIVITY_TIMEOUT);
+
 	/// queries used to access site's elements
 	//prettier-ignore
 	const nodeQueries = {
 		navbarLink: i => `#wide-nav li:nth-of-type(${i + 1}) .nav-top-link`,
-		product: 	i => `.product-small:nth-of-type(${i + 1}) a`,
+		product: 	i => `.products > .product-small:nth-of-type(${i + 1}) a`,
 		download: 	i => `#somdn-form-submit-button`,
 		update: 	i => `.paoc-popup-click`,
 		backToMain: i => `#error-page .wc-forward`,
@@ -24,25 +27,24 @@
 	const incrementStorageKey = key =>
 		localStorage.setItem(key, `${parseInt(localStorage.getItem(key)) + 1}`);
 
-	/// try clicking a query until it's loaded
-	const clickQuery = queryName => document.querySelector(queryName).click();
+	/// try clicking a query, run callback otherwise
+	const tryClickQuery = (queryName, { onFound = null, onNotFound = null }) => {
+		const element = document.querySelector(queryName);
+
+		if (element) {
+			element.click();
+			onFound();
+		} else if (onNotFound) onNotFound();
+	};
 
 	const moveBack = () =>
 		setTimeout(() => {
 			history.back();
-			console.log('move back');
 		}, DELAY);
-
-	/// increment product index
-	const nextProduct = () => {
-		// const newVal = parseInt(localStorage.getItem(STORAGE_PRODUCT_KEY)) + 1;
-		// localStorage.setItem(STORAGE_PRODUCT_KEY, `${newVal}`);
-		incrementStorageKey(STORAGE_PRODUCT_KEY);
-		DEBUG && console.log('next product');
-	};
 
 	const nextTab = () => {
 		if (parseInt(localStorage.getItem(STORAGE_TAB_KEY)) + 1 === TAB_COUNT) {
+			clearTimeout(inactivityTimeout);
 			alert('Pobieranie ukończone');
 			return;
 		}
@@ -54,68 +56,42 @@
 
 	const nextPage = () =>
 		// if cannot find next page btn, move to the next tab
-		onQueryLoad(nodeQueries.nextPage(), () => clickQuery(nodeQueries.nextPage()), nextTab);
-
-	/// callback on element of given query loaded or when not found
-	const onQueryLoad = (queryName, onFound, onNotFound = null) => {
-		const id = setInterval(() => {
-			if (document.querySelector(queryName)) {
-				onFound();
-				clearInterval(id);
-			}
-		}, 10);
-
-		if (onNotFound) setTimeout(onNotFound, DELAY);
-	};
+		tryClickQuery(nodeQueries.nextPage(), { onNotFound: nextTab });
 
 	const pathCallbacks = {
 		'': () => {
 			/// click navbar link
 
 			const tabIndex = parseInt(localStorage.getItem(STORAGE_TAB_KEY));
-			const tabQuery = nodeQueries.navbarLink(tabIndex);
 
-			onQueryLoad(
-				tabQuery,
-				() => {
-					clickQuery(tabQuery);
-					DEBUG && console.log(`entering tab of index ${tabIndex}`);
-				},
-				() => alert('Nie znaleziono zakładki')
-			);
+			tryClickQuery(nodeQueries.navbarLink(tabIndex), {
+				onNotFound: () => alert('Nie znaleziono zakładki'),
+			});
 		},
 		marka: () => {
 			/// click product
 
-			let productIndex = parseInt(localStorage.getItem(STORAGE_PRODUCT_KEY));
-
-			// next page on loop
-			if (productIndex === PRODUCTS_PER_PAGE) {
-				localStorage.setItem(STORAGE_PRODUCT_KEY, '0');
-				productIndex = 0;
-				nextPage();
-			}
-
-			onQueryLoad(
-				nodeQueries.product(productIndex),
-				() => {
-					clickQuery(nodeQueries.product(productIndex));
-					DEBUG && console.log(`entering product of index ${productIndex}`);
-				},
-				nextTab
+			tryClickQuery(
+				nodeQueries.product(parseInt(localStorage.getItem(STORAGE_PRODUCT_KEY))),
+				{
+					onNotFound: () => {
+						localStorage.setItem(STORAGE_PRODUCT_KEY, '0');
+						nextPage();
+					},
+				}
 			);
 		},
 		sklep: () => {
 			/// download and go back
 
-			onQueryLoad(
-				nodeQueries.update(),
-				() => {
-					nextProduct();
-					clickQuery(nodeQueries.download());
+			tryClickQuery(nodeQueries.download(), {
+				onFound: () => incrementStorageKey(STORAGE_PRODUCT_KEY),
+				onNotFound: () => {
+					// for products with no download button
+					if (document.querySelector(nodeQueries.update()))
+						incrementStorageKey(STORAGE_PRODUCT_KEY);
 				},
-				() => console.log('Product not found')
-			);
+			});
 
 			moveBack();
 		},
@@ -124,9 +100,6 @@
 	/// set default counter and tab values
 	if (!localStorage.getItem(STORAGE_PRODUCT_KEY)) localStorage.setItem(STORAGE_PRODUCT_KEY, '0');
 	if (!localStorage.getItem(STORAGE_TAB_KEY)) localStorage.setItem(STORAGE_TAB_KEY, '0');
-
-	/// alert error after inactivity for too long
-	setTimeout(() => alert('Niepowodzenie'), INACTIVITY_TIMEOUT);
 
 	/// execute specified callback depending on path
 	const path = window.location.pathname.split('/')[1] ?? '';
