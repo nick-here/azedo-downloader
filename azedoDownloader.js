@@ -3,11 +3,11 @@
 
 	if (window.location.origin !== 'https://azedo.pl') return;
 
-	const DELAY = 1000;
+	const DELAY = 2000;
 	const INACTIVITY_TIMEOUT = 5000;
 	const STORAGE_PRODUCT_KEY = 'productIndex';
 	const STORAGE_TAB_KEY = 'tabIndex';
-	const PRODUCTS_PER_PAGE = 12;
+	const STORAGE_NOTFOUND_KEY = 'notFound';
 	const TAB_COUNT = 4;
 
 	/// alert error after inactivity for too long
@@ -45,7 +45,11 @@
 	const nextTab = () => {
 		if (parseInt(localStorage.getItem(STORAGE_TAB_KEY)) + 1 === TAB_COUNT) {
 			clearTimeout(inactivityTimeout);
-			alert('Pobieranie ukończone');
+			alert(
+				`Pobieranie ukończone, nie znaleziono ${localStorage.getItem(
+					STORAGE_NOTFOUND_KEY
+				)} produktów`
+			);
 			return;
 		}
 
@@ -90,6 +94,10 @@
 					// for products with no download button
 					if (document.querySelector(nodeQueries.update()))
 						incrementStorageKey(STORAGE_PRODUCT_KEY);
+					else {
+						incrementStorageKey(STORAGE_NOTFOUND_KEY);
+						console.log('not found');
+					}
 				},
 			});
 
@@ -97,9 +105,10 @@
 		},
 	};
 
-	/// set default counter and tab values
-	if (!localStorage.getItem(STORAGE_PRODUCT_KEY)) localStorage.setItem(STORAGE_PRODUCT_KEY, '0');
-	if (!localStorage.getItem(STORAGE_TAB_KEY)) localStorage.setItem(STORAGE_TAB_KEY, '0');
+	/// set default localStorage values
+	[STORAGE_PRODUCT_KEY, STORAGE_TAB_KEY, STORAGE_NOTFOUND_KEY].forEach(key => {
+		if (!localStorage.getItem(key)) localStorage.setItem(key, '0');
+	});
 
 	/// execute specified callback depending on path
 	const path = window.location.pathname.split('/')[1] ?? '';
