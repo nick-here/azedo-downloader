@@ -1,4 +1,5 @@
 (function () {
+	//asd
 	const DEBUG = true;
 
 	if (window.location.origin !== 'https://azedo.pl') return;
