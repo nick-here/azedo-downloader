@@ -34,7 +34,7 @@
 
 		if (element) {
 			element.click();
-			onFound();
+			if (onFound) onFound();
 		} else if (onNotFound) onNotFound();
 	};
 
